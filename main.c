@@ -14,13 +14,18 @@ DWORD WINAPI handle(LPVOID sock);
 extern int getaddrinfo(const char* node, const char* service, const struct addrinfo* hints, struct addrinfo** res);
 extern void freeaddrinfo(struct addrinfo* res);
 
+static int MAX_THREADS;
 static int LOGGING;
+
+static int THREADS = 0;
 
 int main()
 {
 	int PORT;
-	printf("PORT: ");
+	printf("Port: ");
 	scanf_s("%d", &PORT);
+	printf("Thread-limit (<=0 - No limit): ");
+	scanf_s("%d", &MAX_THREADS);
 	printf("Logging (1/0): ");
 	scanf_s("%d", &LOGGING);
 	printf("\n");
@@ -56,6 +61,11 @@ int main()
 			break;
 		}
 
+		if (MAX_THREADS > 0 && THREADS >= MAX_THREADS)
+		{
+			continue;
+		}
+
 		SOCKET client = accept(listener, 0, 0);
 		if (client == INVALID_SOCKET)
 		{
@@ -84,10 +94,18 @@ int main()
 
 DWORD WINAPI handle(LPVOID sock)
 {
+	EnterCriticalSection(&cs);
+	THREADS++;
+	LeaveCriticalSection(&cs);
+
 	SOCKET client = (SOCKET)sock;
 	char* buf = (char*)malloc(BUF);
 	if (buf == NULL)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		//perror("malloc");
 		closesocket(client);
 		return 0;
@@ -96,6 +114,10 @@ DWORD WINAPI handle(LPVOID sock)
 	int bytesReceived = recv(client, buf, BUF - 1, 0);
 	if (bytesReceived <= 0)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		free(buf);
 		closesocket(client);
 		return 0;
@@ -106,6 +128,10 @@ DWORD WINAPI handle(LPVOID sock)
 	char* tempBuf = (char*)realloc(buf, strlen(buf) + 1);
 	if (tempBuf == NULL)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		//perror("realloc");
 		free(buf);
 		closesocket(client);
@@ -124,6 +150,10 @@ DWORD WINAPI handle(LPVOID sock)
 		host = strstr(buf, "HOST: ");
 		if (host == NULL)
 		{
+			EnterCriticalSection(&cs);
+			THREADS--;
+			LeaveCriticalSection(&cs);
+
 			free(buf);
 			closesocket(client);
 			return 0;
@@ -135,6 +165,10 @@ DWORD WINAPI handle(LPVOID sock)
 	char* limit = strstr(buf + hostIndex, "\r\n");
 	if (limit == NULL)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		free(buf);
 		closesocket(client);
 		return 0;
@@ -147,6 +181,10 @@ DWORD WINAPI handle(LPVOID sock)
 	char *url = (char*)malloc(length + 1), *port;
 	if (url == NULL)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		//perror("malloc");
 		free(buf);
 		closesocket(client);
@@ -155,6 +193,10 @@ DWORD WINAPI handle(LPVOID sock)
 
 	if (strncpy_s(url, length + 1, host + 6, length) != 0)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		free(url);
 		free(buf);
 		closesocket(client);
@@ -173,6 +215,10 @@ DWORD WINAPI handle(LPVOID sock)
 		port = (char*)malloc(portLen + 1);
 		if (port == NULL)
 		{
+			EnterCriticalSection(&cs);
+			THREADS--;
+			LeaveCriticalSection(&cs);
+
 			//perror("malloc");
 			free(url);
 			free(buf);
@@ -188,6 +234,10 @@ DWORD WINAPI handle(LPVOID sock)
 		port = (char*)malloc(isSecure ? 4 : 3);
 		if (port == NULL)
 		{
+			EnterCriticalSection(&cs);
+			THREADS--;
+			LeaveCriticalSection(&cs);
+
 			//perror("malloc");
 			free(url);
 			free(buf);
@@ -210,12 +260,16 @@ DWORD WINAPI handle(LPVOID sock)
 	if (LOGGING)
 	{
 		EnterCriticalSection(&cs);
-		printf("%s:%s\n", url, port);
+		printf("%s:%s | %d\n", url, port, THREADS);
 		LeaveCriticalSection(&cs);
 	}
 
 	if (url[0] == '\0')
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		free(url);
 		free(port);
 		free(buf);
@@ -226,6 +280,10 @@ DWORD WINAPI handle(LPVOID sock)
 	SOCKET server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (server == INVALID_SOCKET)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		free(url);
 		free(port);
 		free(buf);
@@ -240,6 +298,10 @@ DWORD WINAPI handle(LPVOID sock)
 
 	if (getaddrinfo(url, port, &hints, &serverInfo) != 0)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		//perror("getaddrinfo");
 		free(url);
 		free(port);
@@ -251,6 +313,10 @@ DWORD WINAPI handle(LPVOID sock)
 
 	if (connect(server, serverInfo->ai_addr, (int)serverInfo->ai_addrlen) == SOCKET_ERROR)
 	{
+		EnterCriticalSection(&cs);
+		THREADS--;
+		LeaveCriticalSection(&cs);
+
 		//perror("connect");
 		free(url);
 		free(port);
@@ -272,6 +338,10 @@ DWORD WINAPI handle(LPVOID sock)
 		buf = (char*)malloc(BUF);
 		if (buf == NULL)
 		{
+			EnterCriticalSection(&cs);
+			THREADS--;
+			LeaveCriticalSection(&cs);
+
 			//perror("malloc");
 			free(url);
 			free(port);
@@ -332,6 +402,10 @@ DWORD WINAPI handle(LPVOID sock)
 			send(client, buf, bytesReceived, 0);
 		}
 	}
+
+	EnterCriticalSection(&cs);
+	THREADS--;
+	LeaveCriticalSection(&cs);
 
 	free(url);
 	free(port);
