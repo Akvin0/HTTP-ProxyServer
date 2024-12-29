@@ -22,6 +22,8 @@ static int LOGGING;
 
 static int THREADS = 0;
 
+static int finalize = 0;
+
 int main()
 {
 	int PORT;
@@ -49,6 +51,9 @@ int main()
 		return -1;
 	}
 
+	u_long mode = 1;
+	ioctlsocket(listener, FIONBIO, &mode);
+
 	struct sockaddr_in serverAddr;
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_addr.s_addr = INADDR_ANY;
@@ -59,21 +64,47 @@ int main()
 
 	InitializeCriticalSection(&cs);
 
+	int lastThreadsCount = -1;
 	while (1)
 	{
-		if (GetAsyncKeyState(VK_PAUSE))
+		if (GetAsyncKeyState(VK_INSERT) && !finalize)
 		{
-			break;
+			printf("\n");
+			finalize = 1;
+		}
+
+		if (finalize)
+		{
+			if (!THREADS)
+			{
+				break;
+			}
+			else
+			{
+				if (lastThreadsCount != THREADS)
+				{
+					printf("%d\n", THREADS);
+					lastThreadsCount = THREADS;
+				}
+
+				Sleep(1);
+
+				continue;
+			}
 		}
 
 		if (THREAD_LIMIT > 0 && THREADS >= THREAD_LIMIT)
 		{
+			Sleep(1);
+
 			continue;
 		}
 
 		SOCKET client = accept(listener, 0, 0);
 		if (client == INVALID_SOCKET)
 		{
+			Sleep(1);
+
 			continue;
 		}
 
@@ -84,9 +115,10 @@ int main()
 		}
 		else
 		{
-			perror("CreateThread");
 			closesocket(client);
 		}
+
+		Sleep(1);
 	}
 
 	DeleteCriticalSection(&cs);
@@ -298,7 +330,7 @@ DWORD WINAPI handle(LPVOID sock)
 			return ReturnHandleValue(0);
 		}
 
-		while (GetTickCount64() - start < THREAD_LIFETIME)
+		while (GetTickCount64() - start < THREAD_LIFETIME && !finalize)
 		{
 			fd_set read_fds;
 			FD_ZERO(&read_fds);
@@ -350,7 +382,7 @@ DWORD WINAPI handle(LPVOID sock)
 			return ReturnHandleValue(0);
 		}
 
-		while (GetTickCount64() - start < THREAD_LIFETIME)
+		while (GetTickCount64() - start < THREAD_LIFETIME && !finalize)
 		{
 			bytesReceived = recv(server, buf, BUF - 1, 0);
 			if (bytesReceived <= 0)
@@ -372,12 +404,16 @@ DWORD WINAPI handle(LPVOID sock)
 
 int SetSocketTimeout(SOCKET socket)
 {
-	if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&THREAD_LIFETIME, sizeof(THREAD_LIFETIME)) < 0)
+	struct timeval tv;
+	tv.tv_sec = THREAD_LIFETIME / 1000;
+	tv.tv_usec = THREAD_LIFETIME * 1000;
+
+	if (setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, sizeof(tv)) < 0)
 	{
 		return 0;
 	}
 
-	if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&THREAD_LIFETIME, sizeof(THREAD_LIFETIME)) < 0)
+	if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv)) < 0)
 	{
 		return 0;
 	}
