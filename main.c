@@ -391,6 +391,22 @@ DWORD WINAPI handle(LPVOID sock)
 	{
 		send(server, buf, (int)strlen(buf), 0);
 
+		free(buf);
+		buf = (char*)malloc(BUF);
+		if (buf == NULL)
+		{
+			EnterCriticalSection(&cs);
+			THREADS--;
+			LeaveCriticalSection(&cs);
+
+			//perror("malloc");
+			free(url);
+			free(port);
+			closesocket(server);
+			closesocket(client);
+			return 0;
+		}
+
 		while (1)
 		{
 			bytesReceived = recv(server, buf, BUF - 1, 0);
