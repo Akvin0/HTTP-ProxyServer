@@ -142,7 +142,7 @@ DWORD WINAPI handle(LPVOID sock)
 	tempBuf = NULL;
 
 	char* connectS = strstr(buf, "CONNECT ");
-	int isSecure = connectS - buf == 0;
+	int isSecure = connectS == NULL ? 0 : connectS - buf == 0;
 
 	char* host = strstr(buf, "Host: ");
 	if (host == NULL)
