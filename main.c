@@ -129,17 +129,6 @@ DWORD WINAPI handle(LPVOID sock)
 
 	buf[bytesReceived] = '\0';
 
-	char* tempBuf = (char*)realloc(buf, strlen(buf) + 1);
-	if (tempBuf == NULL)
-	{
-		free(buf);
-		closesocket(client);
-		return ReturnHandleValue(0);
-	}
-
-	buf = tempBuf;
-	tempBuf = NULL;
-
 	char* connectS = strstr(buf, "CONNECT ");
 	int isSecure = connectS == NULL ? 0 : connectS - buf == 0;
 
