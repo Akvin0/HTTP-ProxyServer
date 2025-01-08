@@ -22,8 +22,6 @@ static int LOGGING;
 
 static int THREADS = 0;
 
-static int finalize = 0;
-
 int main()
 {
 	int PORT;
@@ -67,32 +65,6 @@ int main()
 	int lastThreadsCount = -1;
 	while (1)
 	{
-		if (GetAsyncKeyState(VK_INSERT) && !finalize)
-		{
-			printf("\n");
-			finalize = 1;
-		}
-
-		if (finalize)
-		{
-			if (!THREADS)
-			{
-				break;
-			}
-			else
-			{
-				if (lastThreadsCount != THREADS)
-				{
-					printf("%d\n", THREADS);
-					lastThreadsCount = THREADS;
-				}
-
-				Sleep(1);
-
-				continue;
-			}
-		}
-
 		if (THREAD_LIMIT > 0 && THREADS >= THREAD_LIMIT)
 		{
 			Sleep(1);
