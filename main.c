@@ -302,7 +302,7 @@ DWORD WINAPI handle(LPVOID sock)
 			return ReturnHandleValue(0);
 		}
 
-		while (GetTickCount64() - start < THREAD_LIFETIME && !finalize)
+		while (GetTickCount64() - start < THREAD_LIFETIME)
 		{
 			fd_set read_fds;
 			FD_ZERO(&read_fds);
@@ -354,7 +354,7 @@ DWORD WINAPI handle(LPVOID sock)
 			return ReturnHandleValue(0);
 		}
 
-		while (GetTickCount64() - start < THREAD_LIFETIME && !finalize)
+		while (GetTickCount64() - start < THREAD_LIFETIME)
 		{
 			bytesReceived = recv(server, buf, BUF - 1, 0);
 			if (bytesReceived <= 0)
